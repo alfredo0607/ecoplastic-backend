@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import es from "dayjs/locale/es.js";
 import express from "express";
-import { body, validationResult } from "express-validator";
+import { body, check, validationResult } from "express-validator";
 import connection from "../db.js";
 import codeGenerator from "../helpers/codeGenerator.js";
 import {
@@ -16,6 +16,41 @@ import isAdmin from "../utils/isAdmin.js";
 import checkToken from "../utils/middlewares.js";
 
 const usersRouter = express.Router();
+
+const mimeTypes = [
+  "application/msword",
+  "application/vnd.ms-word.document.macroEnabled.12",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+  "application/vnd.ms-word.template.macroEnabled.12",
+  "application/pdf",
+  "application/vnd.ms-powerpoint.template.macroEnabled.12",
+  "application/vnd.openxmlformats-officedocument.presentationml.template",
+  "application/vnd.ms-powerpoint.addin.macroEnabled.12",
+  "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+  "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+  "application/vnd.ms-powerpoint.slideshow.macroEnabled.12",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/json",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-excel.sheet.macroEnabled.12",
+  "application/x-rar-compressed",
+  "application/octet-stream",
+  "application/zip",
+  "application/octet-stream",
+  "application/x-zip-compressed",
+  "multipart/x-zip",
+  "image/bmp",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+];
 
 usersRouter.post(
   "/register_users_operator",
@@ -1141,5 +1176,242 @@ usersRouter.post(
     }
   }
 );
+
+usersRouter.post(
+  "/subir_archivo_explorador_archivos/:userID",
+  [
+    check("referencia", "El nombre de la referencia es obligatorio")
+      .not()
+      .isEmpty(),
+    check("directorio", "El nombre de la referencia es obligatorio")
+      .not()
+      .isEmpty(),
+    check("favorito", "Este campo es obligatorio").not().isEmpty(),
+    check("compartido", "Este campo es obligatorio").not().isEmpty(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(422).json({ errores: errors.array(), data: "" });
+    }
+
+    const newConnection = await connection.awaitGetConnection();
+    await newConnection.awaitBeginTransaction();
+
+    try {
+      const { referencia, favorito, directorio } = req.body;
+      const { archivos } = req.files;
+      const { userID } = req.params;
+
+      let filesArray = [];
+      let filesResponse = [];
+
+      if (!Array.isArray(archivos)) filesArray = [archivos];
+      else filesArray = archivos;
+
+      for (const archivo of filesArray) {
+        const arrayFile = archivo.name.split(".");
+        const nombreServidor = codeGenerator.generarNombreArchivo(
+          archivo.md5,
+          arrayFile[arrayFile.length - 1]
+        );
+        const extension = arrayFile[arrayFile.length - 1];
+
+        if (!mimeTypes.includes(archivo.mimetype)) {
+          return res.status(422).json({
+            errores: `El tipo de archivo de: ${archivo.name} no esta permitido, operacion cancelada`,
+            data: "",
+          });
+        }
+
+        const rutaArchivo = `uploads/${directorio}/${nombreServidor}`;
+        const rutaCompleta = `${process.cwd()}/src/public/uploads/${directorio}/${nombreServidor}`;
+
+        const isImage =
+          archivo.mimetype.split("/")[0] === "image" ||
+          archivo.mimetype.split("/")[0] === "video"
+            ? 1
+            : 0;
+
+        await archivo.mv(rutaCompleta);
+
+        const file = await uploadFile(
+          nombreServidor,
+          archivo.name,
+          archivo.size,
+          extension,
+          parseInt(userID),
+          referencia
+        );
+
+        if (file === 0) {
+          newConnection.release();
+          return res
+            .status(422)
+            .json(
+              formatResponse(
+                {},
+                `Hubo un error al intentar subir el archivo, por favor volverlo a intentar.`
+              )
+            );
+        }
+
+        const idArchivo = await newConnection.awaitQuery(
+          `SELECT MAX(fk_idArchivo) idArchivo FROM ref_archivos_adjuntos WHERE seccionReferencia = ? AND idReferencia = ?`,
+          [referencia, parseInt(userID)]
+        );
+
+        await newConnection.awaitQuery(
+          `INSERT INTO explorador_archivos_usuario VALUES(?, ?, ?, ?, ?, ?)`,
+          [
+            parseInt(idArchivo[0].idArchivo),
+            parseInt(userID),
+            rutaArchivo,
+            parseInt(favorito),
+            isImage,
+            0,
+          ]
+        );
+
+        const fileInfo = await newConnection.awaitQuery(
+          `SELECT nombreCliente, fechaCreado FROM archivos_adjuntos WHERE idArchivo = ?`,
+          [idArchivo[0].idArchivo]
+        );
+
+        const fileInfoResponse = {
+          id: idArchivo[0].idArchivo,
+          icon: extension,
+          fileName: fileInfo[0].nombreCliente,
+          serverName: `http://localhost:3006/${rutaArchivo}`,
+          thumnail: String(extension).toUpperCase(),
+          isImage: isImage,
+          date: fileInfo[0].fechaCreado,
+          selected: false,
+          favorite: parseInt(favorito),
+        };
+
+        filesResponse = [...filesResponse, fileInfoResponse];
+      }
+
+      await newConnection.awaitCommit();
+      newConnection.release();
+
+      return res.status(200).json({
+        errores: "",
+        data: {
+          message: "archivo subido con exito",
+          registro: filesResponse,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+      newConnection.release();
+      const errorFormated = formatErrorResponse(error);
+      return res.status(500).json(errorFormated);
+    }
+  }
+);
+
+usersRouter.post("/obtener_archivos_usuario/:userID", async (req, res) => {
+  const resultErrors = validationResult(req).formatWith(errorFormatter);
+  if (!resultErrors.isEmpty()) {
+    const errorResponse = formatErrorValidator(resultErrors);
+    return res.status(422).json(formatResponse({}, errorResponse));
+  }
+
+  const newConnection = await connection.awaitGetConnection();
+
+  try {
+    let offset = 0;
+    let whereQuery = "";
+    let hasNextPage = false;
+
+    const { userID } = req.params;
+    const { page, limit, q, shared } = req.query;
+    const { extensions } = req.body;
+
+    if (parseInt(page) > 0) offset = page * parseInt(limit);
+
+    if (q && q !== "") {
+      if (whereQuery.startsWith("AND"))
+        whereQuery += ` (a.nombreCliente LIKE '%${q}%')`;
+      else whereQuery += `AND (a.nombreCliente LIKE '%${q}%')`;
+    }
+
+    if (extensions && extensions.length > 0) {
+      let subQuery;
+
+      const validExtensions = extensions.filter((ext) => ext !== "FAVORITOS");
+
+      if (extensions.includes("FAVORITOS"))
+        subQuery = `${q !== "" ? "AND " : ""}e.favorito = 1 AND (`;
+      else subQuery = `${q !== "" ? "AND " : ""}(`;
+
+      for (const ext of validExtensions) {
+        subQuery += `a.extensionArchivo LIKE '%${ext}%' OR `;
+      }
+
+      subQuery = subQuery.substring(0, subQuery.length - 4);
+
+      subQuery += ")";
+
+      if (whereQuery.startsWith("AND")) whereQuery += ` ${subQuery}`;
+      else whereQuery += `AND ${subQuery}`;
+    }
+
+    const total = await newConnection.awaitQuery(
+      `SELECT COUNT(*) totalRegistros 
+        FROM explorador_archivos_usuario e
+        INNER JOIN archivos_adjuntos a
+          ON a.idArchivo = e.fk_idArchivo
+        WHERE e.fk_userID = ? AND e.esCompartido = ? ${whereQuery}
+      `,
+      [parseInt(userID), parseInt(shared)]
+    );
+
+    const results = await newConnection.awaitQuery(
+      `SELECT a.nombreCliente fileName, a.nombreServidor, a.fechaCreado date, a.extensionArchivo icon,
+          e.fk_idArchivo id, e.rutaCompleta, e.favorito favorite, e.isImage, e.esCompartido shared
+        
+        FROM explorador_archivos_usuario e
+        INNER JOIN archivos_adjuntos a
+          ON a.idArchivo = e.fk_idArchivo
+        WHERE e.fk_userID = ? AND e.esCompartido = ? ${whereQuery}
+        ORDER BY a.fechaCreado DESC
+        LIMIT ?, ?
+      `,
+      [parseInt(userID), parseInt(shared), offset, parseInt(limit)]
+    );
+
+    newConnection.release();
+
+    const formatedFiles = results.map((item) => ({
+      ...item,
+      icon: item.nombreServidor.split(".")[1],
+      thumnail: String(item.nombreServidor.split(".")[1]).toUpperCase(),
+      selected: false,
+      serverName: `http://localhost:3006/${item.rutaCompleta}`,
+    }));
+
+    if (parseInt(total[0].totalRegistros) > offset + formatedFiles.length)
+      hasNextPage = true;
+    else hasNextPage = false;
+
+    return res.status(200).json({
+      errores: "",
+      data: {
+        options: formatedFiles,
+        total: total[0].totalRegistros,
+        hasNextPage,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    newConnection.release();
+    const errorFormated = formatErrorResponse(error);
+    return res.status(500).json(errorFormated);
+  }
+});
 
 export default usersRouter;

@@ -516,204 +516,211 @@ authRouter.post(
   }
 );
 
-authRouter.post("/recover-password", async (req, res) => {
-  const resultErrors = validationResult(req).formatWith(errorFormatter);
-  if (!resultErrors.isEmpty()) {
-    const errorResponse = formatErrorValidator(resultErrors);
-    return res.status(422).json(formatResponse({}, errorResponse));
-  }
+authRouter.post(
+  "/recover-password",
+  [body("cedula").notEmpty().withMessage("La cedula es obigatoria")],
 
-  if (
-    req.query.methodRecover !== "methodEmail" &&
-    req.query.methodRecover !== "methodQuestion"
-  ) {
-    newConnection.release();
-    return res
-      .status(422)
-      .json(
-        formatResponse(
-          {},
-          `Por favor enviar un tipo de metodo valido, methodEmail/methodQuestion.`
-        )
-      );
-  }
+  async (req, res) => {
+    const resultErrors = validationResult(req).formatWith(errorFormatter);
+    if (!resultErrors.isEmpty()) {
+      const errorResponse = formatErrorValidator(resultErrors);
+      return res.status(422).json(formatResponse({}, errorResponse));
+    }
 
-  const newConnection = await connection.awaitGetConnection();
-  await newConnection.awaitBeginTransaction();
-
-  try {
-    const { email, respuestaUno, respuestaDos, cedula } = req.body;
-    const { methodRecover } = req.query;
-
-    if (methodRecover === "methodEmail") {
-      if (!req.body.email || req.body.email === "") {
-        return res
-          .status(422)
-          .json(
-            formatResponse(
-              {},
-              `Este campo es de tipo obligatorio para el metodo de recuperacion elegido.`
-            )
-          );
-      }
-
-      const existUsersEmail = await newConnection.awaitQuery(
-        `SELECT idusers, cedula FROM usuario WHERE email= ?`,
-        [email]
-      );
-
-      if (!existUsersEmail[0]) {
-        newConnection.release();
-        return res
-          .status(422)
-          .json(
-            formatResponse(
-              {},
-              `No se encontró un usuario asociado al correo : ${email}.`
-            )
-          );
-      }
-
-      const { idusers, cedula } = existUsersEmail[0];
-
-      const codigoEmail = codeGenerator.generarCodigoRecuperacion();
-
-      const existCodeTemp = await newConnection.awaitQuery(
-        `SELECT * FROM codigo_verificacion WHERE fk_idusers = ?`,
-        [idusers]
-      );
-
-      if (existCodeTemp[0]) {
-        await newConnection.awaitQuery(
-          `UPDATE codigo_verificacion SET codigo = ? WHERE fk_idusers= ?`,
-          [codigoEmail, idusers]
+    if (
+      req.query.methodRecover !== "methodEmail" &&
+      req.query.methodRecover !== "methodQuestion"
+    ) {
+      newConnection.release();
+      return res
+        .status(422)
+        .json(
+          formatResponse(
+            {},
+            `Por favor enviar un tipo de metodo valido, methodEmail/methodQuestion.`
+          )
         );
-      } else {
-        await newConnection.awaitQuery(
-          `INSERT INTO codigo_verificacion VALUES(?, ?)`,
-          [idusers, codigoEmail]
-        );
-      }
+    }
 
-      const result = await sendEmail(
-        email,
-        "Recuperación de contraseña - EcoPlastic",
-        `
+    const newConnection = await connection.awaitGetConnection();
+    await newConnection.awaitBeginTransaction();
+
+    try {
+      const { email, respuestaUno, respuestaDos, cedula } = req.body;
+      const { methodRecover } = req.query;
+
+      console.log(req.body);
+
+      if (methodRecover === "methodEmail") {
+        if (!req.body.email || req.body.email === "") {
+          return res
+            .status(422)
+            .json(
+              formatResponse(
+                {},
+                `Este campo es de tipo obligatorio para el metodo de recuperacion elegido.`
+              )
+            );
+        }
+
+        const existUsersEmail = await newConnection.awaitQuery(
+          `SELECT idusers, cedula FROM usuario WHERE email= ? AND cedula= ?`,
+          [email, req.body.cedula]
+        );
+
+        if (!existUsersEmail[0]) {
+          newConnection.release();
+          return res
+            .status(422)
+            .json(
+              formatResponse(
+                {},
+                `El correo : ${email} no se encuentra asociado a este usuario.`
+              )
+            );
+        }
+
+        const { idusers, cedula } = existUsersEmail[0];
+
+        const codigoEmail = codeGenerator.generarCodigoRecuperacion();
+
+        const existCodeTemp = await newConnection.awaitQuery(
+          `SELECT * FROM codigo_verificacion WHERE fk_idusers = ?`,
+          [idusers]
+        );
+
+        if (existCodeTemp[0]) {
+          await newConnection.awaitQuery(
+            `UPDATE codigo_verificacion SET codigo = ? WHERE fk_idusers= ?`,
+            [codigoEmail, idusers]
+          );
+        } else {
+          await newConnection.awaitQuery(
+            `INSERT INTO codigo_verificacion VALUES(?, ?)`,
+            [idusers, codigoEmail]
+          );
+        }
+
+        const result = await sendEmail(
+          email,
+          "Recuperación de contraseña - EcoPlastic",
+          `
          Has solicitado restaurar su contraseña,
          por favor ingresa el código de abajo en la Plataforma para continuar con tu proceso de recuperación de contraseña.
          Código: ${codigoEmail}
        `,
-        templateEmailPassRecovery(cedula, codigoEmail, email)
-      );
-
-      await newConnection.awaitCommit();
-      newConnection.release();
-
-      return res.status(201).json(
-        formatResponse(
-          {
-            message: "Código de verificación enviado con éxito",
-            result,
-          },
-          ""
-        )
-      );
-    }
-
-    if (methodRecover === "methodQuestion") {
-      if (!req.body.respuestaUno || req.body.respuestaUno === "") {
-        newConnection.release();
-        return res.status(422).json(
-          formatResponse(
-            {},
-            {
-              respuestaUno:
-                "Este campo es de tipo obligatorio para el metodo de recuperacion elegido.",
-            }
-          )
+          templateEmailPassRecovery(cedula, codigoEmail, email)
         );
-      }
 
-      if (!req.body.respuestaDos || req.body.respuestaDos === "") {
+        await newConnection.awaitCommit();
         newConnection.release();
-        return res.status(422).json(
-          formatResponse(
-            {},
-            {
-              respuestaDos:
-                "Este campo es de tipo obligatorio para el metodo de recuperacion elegido.",
-            }
-          )
-        );
-      }
 
-      const existUsers = await newConnection.awaitQuery(
-        `SELECT idusers, cedula FROM usuario WHERE cedula= ?`,
-        [cedula]
-      );
-
-      if (!existUsers[0]) {
-        newConnection.release();
-        return res
-          .status(422)
-          .json(
-            formatResponse(
-              {},
-              `No se encontró un usuario asociado al correo : ${cedula}.`
-            )
-          );
-      }
-
-      const { idusers } = existUsers[0];
-
-      const respuestasDB = await connection.awaitQuery(
-        `SELECT respuesta_1, respuesta_2 FROM preguntas_seguridad WHERE fk_idusers = ?`,
-        [idusers]
-      );
-
-      if (!respuestasDB[0]) {
-        newConnection.release();
-        return res
-          .status(422)
-          .json(
-            formatResponse(
-              {},
-              `El respuesta de seguridad no se encuentra en la base de datos, comprueba que el ID de usuario es correcto.`
-            )
-          );
-      }
-
-      if (
-        respuestasDB[0].respuesta_1 === respuestaUno.trim() &&
-        respuestasDB[0].respuesta_2 === respuestaDos.trim()
-      ) {
         return res.status(201).json(
           formatResponse(
             {
-              message: "Las respuestas son correctas.",
-              access: true,
+              message: "Código de verificación enviado con éxito",
+              result,
             },
-            ``
+            ""
           )
         );
-      } else {
-        return res
-          .status(422)
-          .json(
+      }
+
+      if (methodRecover === "methodQuestion") {
+        if (!req.body.respuestaUno || req.body.respuestaUno === "") {
+          newConnection.release();
+          return res.status(422).json(
             formatResponse(
               {},
-              `Intentalo de nuevo las respuestas no coinciden.`
+              {
+                respuestaUno:
+                  "Este campo es de tipo obligatorio para el metodo de recuperacion elegido.",
+              }
             )
           );
+        }
+
+        if (!req.body.respuestaDos || req.body.respuestaDos === "") {
+          newConnection.release();
+          return res.status(422).json(
+            formatResponse(
+              {},
+              {
+                respuestaDos:
+                  "Este campo es de tipo obligatorio para el metodo de recuperacion elegido.",
+              }
+            )
+          );
+        }
+
+        const existUsers = await newConnection.awaitQuery(
+          `SELECT idusers, cedula FROM usuario WHERE cedula= ?`,
+          [cedula]
+        );
+
+        if (!existUsers[0]) {
+          newConnection.release();
+          return res
+            .status(422)
+            .json(
+              formatResponse(
+                {},
+                `No se encontró un usuario asociado al correo : ${cedula}.`
+              )
+            );
+        }
+
+        const { idusers } = existUsers[0];
+
+        const respuestasDB = await connection.awaitQuery(
+          `SELECT respuesta_1, respuesta_2 FROM preguntas_seguridad WHERE fk_idusers = ?`,
+          [idusers]
+        );
+
+        if (!respuestasDB[0]) {
+          newConnection.release();
+          return res
+            .status(422)
+            .json(
+              formatResponse(
+                {},
+                `El respuesta de seguridad no se encuentra en la base de datos, comprueba que el ID de usuario es correcto.`
+              )
+            );
+        }
+
+        if (
+          respuestasDB[0].respuesta_1 === respuestaUno.trim() &&
+          respuestasDB[0].respuesta_2 === respuestaDos.trim()
+        ) {
+          return res.status(201).json(
+            formatResponse(
+              {
+                message: "Las respuestas son correctas.",
+                access: true,
+              },
+              ``
+            )
+          );
+        } else {
+          return res
+            .status(422)
+            .json(
+              formatResponse(
+                {},
+                `Intentalo de nuevo las respuestas no coinciden.`
+              )
+            );
+        }
       }
+    } catch (error) {
+      console.log(error);
+      newConnection.release();
+      const errorFormated = formatErrorResponse(error);
+      return res.status(500).json(errorFormated);
     }
-  } catch (error) {
-    console.log(error);
-    newConnection.release();
-    const errorFormated = formatErrorResponse(error);
-    return res.status(500).json(errorFormated);
   }
-});
+);
 
 authRouter.get("/obtener_email/:cedula", async (req, res) => {
   const resultErrors = validationResult(req).formatWith(errorFormatter);

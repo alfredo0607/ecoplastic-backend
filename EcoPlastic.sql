@@ -250,6 +250,108 @@ CREATE TABLE IF NOT EXISTS `ecoPlastic`.`ref_archivos_adjuntos` (
     ON UPDATE NO ACTION);
 
 
+DROP TABLE IF EXISTS `ecoPlastic`.`categoria` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`categoria` (
+  `idcategoria` INT NOT NULL AUTO_INCREMENT,
+  `nombre` VARCHAR(45) NOT NULL,
+  PRIMARY KEY (`idcategoria`));
+
+
+-- -----------------------------------------------------
+-- Table `ecoPlastic`.`productos`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `ecoPlastic`.`productos` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`productos` (
+  `idproductos` INT NOT NULL AUTO_INCREMENT,
+  `categoria_idcategoria` INT NOT NULL,
+  `titulo` VARCHAR(255) NOT NULL,
+  `descripcion` TEXT NOT NULL,
+  `createdate` DATETIME NULL,
+  `comments` TINYINT(1) NOT NULL DEFAULT 1,
+  `isocultar` TINYINT(1) NOT NULL DEFAULT 1,
+  `usuario_idusers` INT NOT NULL,
+  PRIMARY KEY (`idproductos`),
+  INDEX `fk_productos_categoria1_idx` (`categoria_idcategoria` ASC) ,
+  INDEX `fk_productos_usuario1_idx` (`usuario_idusers` ASC) ,
+  CONSTRAINT `fk_productos_categoria1`
+    FOREIGN KEY (`categoria_idcategoria`)
+    REFERENCES `ecoPlastic`.`categoria` (`idcategoria`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_productos_usuario1`
+    FOREIGN KEY (`usuario_idusers`)
+    REFERENCES `ecoPlastic`.`usuario` (`idusers`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+-- -----------------------------------------------------
+-- Table `ecoPlastic`.`rating`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `ecoPlastic`.`rating` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`rating` (
+  `idrating` INT NOT NULL,
+  `calificacion` INT NOT NULL,
+  `productos_idproductos` INT NOT NULL,
+  PRIMARY KEY (`idrating`),
+  INDEX `fk_rating_productos1_idx` (`productos_idproductos` ASC) VISIBLE,
+  CONSTRAINT `fk_rating_productos1`
+    FOREIGN KEY (`productos_idproductos`)
+    REFERENCES `ecoPlastic`.`productos` (`idproductos`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+
+DROP TABLE IF EXISTS `ecoPlastic`.`explorador_archivos_usuario` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`explorador_archivos_usuario` (
+  `fk_idArchivo` INT NOT NULL,
+  `fk_userID` INT NOT NULL,
+  `rutaCompleta` TEXT NOT NULL,
+  `favorito` TINYINT(1) NOT NULL,
+  `isImage` TINYINT(1) NOT NULL DEFAULT 0,
+  `esCompartido` TINYINT(1) NOT NULL DEFAULT 0,
+  INDEX `fk_explorador_archivos_usuario_archivos_adjuntos1_idx` (`fk_idArchivo` ASC) ,
+  INDEX `fk_explorador_archivos_usuario_usuario1_idx` (`fk_userID` ASC) ,
+  CONSTRAINT `fk_explorador_archivos_usuario_archivos_adjuntos1`
+    FOREIGN KEY (`fk_idArchivo`)
+    REFERENCES `ecoPlastic`.`archivos_adjuntos` (`idArchivo`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_explorador_archivos_usuario_usuario1`
+    FOREIGN KEY (`fk_userID`)
+    REFERENCES `ecoPlastic`.`usuario` (`idusers`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+    DROP TABLE IF EXISTS `ecoPlastic`.`comentarios` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`comentarios` (
+  `idcomentarios` INT NOT NULL AUTO_INCREMENT,
+  `comentario` TEXT NOT NULL,
+  `calificacion` INT NOT NULL DEFAULT 1,
+  `fk_idproductos` INT NOT NULL,
+  `fk_idusers` INT NOT NULL,
+  PRIMARY KEY (`idcomentarios`),
+  INDEX `fk_comentarios_productos1_idx` (`fk_idproductos` ASC) ,
+  INDEX `fk_comentarios_usuario1_idx` (`fk_idusers` ASC) ,
+  CONSTRAINT `fk_comentarios_productos1`
+    FOREIGN KEY (`fk_idproductos`)
+    REFERENCES `ecoPlastic`.`productos` (`idproductos`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_comentarios_usuario1`
+    FOREIGN KEY (`fk_idusers`)
+    REFERENCES `ecoPlastic`.`usuario` (`idusers`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
