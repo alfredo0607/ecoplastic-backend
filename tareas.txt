@@ -1,0 +1,20 @@
+1- que un usuario no pueda ver las publicaciones de su empresa
+
+
+
+
+idSolicitud
+descripcion
+estado (En revicion, Aprobada, Rechazada)
+idProducto
+idUsuario
+
+///
+solicitud_has_product_intercambio
+fk_idSolicitud
+fk_idProducto
+
+
+
+
+

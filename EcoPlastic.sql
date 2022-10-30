@@ -352,6 +352,82 @@ CREATE TABLE IF NOT EXISTS `ecoPlastic`.`comentarios` (
     ON UPDATE NO ACTION);
 
 
+    -- -----------------------------------------------------
+-- Table `ecoPlastic`.`solicitudes`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `ecoPlastic`.`solicitudes` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`solicitudes` (
+  `idSolicitud` INT NOT NULL AUTO_INCREMENT,
+  `mensaje` TEXT NOT NULL,
+  `createDate` DATETIME NOT NULL,
+  `fk_idproductos` INT NOT NULL,
+  `idusers_envia` INT NOT NULL,
+  `estado` ENUM('En revision', 'Aprobada', 'Rechazada') NOT NULL DEFAULT 'En revision',
+  PRIMARY KEY (`idSolicitud`),
+  INDEX `fk_solicitudes_productos1_idx` (`fk_idproductos` ASC),
+  INDEX `fk_solicitudes_usuario1_idx` (`idusers_envia` ASC),
+  CONSTRAINT `fk_solicitudes_productos1`
+    FOREIGN KEY (`fk_idproductos`)
+    REFERENCES `ecoPlastic`.`productos` (`idproductos`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_solicitudes_usuario1`
+    FOREIGN KEY (`idusers_envia`)
+    REFERENCES `ecoPlastic`.`usuario` (`idusers`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+-- -----------------------------------------------------
+-- Table `ecoPlastic`.`producto_de_intercambio`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `ecoPlastic`.`producto_de_intercambio` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`producto_de_intercambio` (
+  `solicitudes_idSolicitud` INT NOT NULL,
+  `productos_idproductos` INT NOT NULL,
+  INDEX `fk_producto_de_intercambio_solicitudes1_idx` (`solicitudes_idSolicitud` ASC) ,
+  INDEX `fk_producto_de_intercambio_productos1_idx` (`productos_idproductos` ASC) ,
+  CONSTRAINT `fk_producto_de_intercambio_solicitudes1`
+    FOREIGN KEY (`solicitudes_idSolicitud`)
+    REFERENCES `ecoPlastic`.`solicitudes` (`idSolicitud`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_producto_de_intercambio_productos1`
+    FOREIGN KEY (`productos_idproductos`)
+    REFERENCES `ecoPlastic`.`productos` (`idproductos`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+-- -----------------------------------------------------
+-- Table `ecoPlastic`.`mensajes_solicitud`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `ecoPlastic`.`mensajes_solicitud` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`mensajes_solicitud` (
+  `idMensaje` INT NOT NULL AUTO_INCREMENT,
+  `fk_idSolicitud` INT NOT NULL,
+  `textoMensaje` TEXT NOT NULL,
+  `fechaMensaje` DATETIME NOT NULL,
+  `fk_idUsuarioEnvia` INT NOT NULL,
+  PRIMARY KEY (`idMensaje`),
+  INDEX `fk_mensajes_solicitud_solicitudes1_idx` (`fk_idSolicitud` ASC) ,
+  INDEX `fk_mensajes_solicitud_usuario1_idx` (`fk_idUsuarioEnvia` ASC) ,
+  CONSTRAINT `fk_mensajes_solicitud_solicitudes1`
+    FOREIGN KEY (`fk_idSolicitud`)
+    REFERENCES `ecoPlastic`.`solicitudes` (`idSolicitud`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_mensajes_solicitud_usuario1`
+    FOREIGN KEY (`fk_idUsuarioEnvia`)
+    REFERENCES `ecoPlastic`.`usuario` (`idusers`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
