@@ -230,12 +230,7 @@ routerSolicitudes.get("/get_admin_solicitud/:idEmpresa", async (req, res) => {
 
     return res
       .status(201)
-      .json(
-        formatResponse(
-          { message: "Solicitud enviada con exito", request: arrayResults },
-          ""
-        )
-      );
+      .json(formatResponse({ message: "", request: arrayResults }, ""));
   } catch (error) {
     console.log(error);
     newConnection.release();
@@ -305,6 +300,12 @@ routerSolicitudes.get(
           [usuario_idusers]
         );
 
+        const getPedido = await newConnection.awaitQuery(
+          `SELECT * FROM pedido  WHERE fk_idSolicitud = ?
+              `,
+          [solicitudID]
+        );
+
         newConnection.release();
 
         return res.status(201).json({
@@ -316,6 +317,7 @@ routerSolicitudes.get(
               productoIntercambio: productoIntercambio,
               userEnvia,
               userGestiona,
+              pedido: getPedido && getPedido[0] ? getPedido[0] : null,
             },
           },
         });
@@ -467,5 +469,157 @@ routerSolicitudes.get(
     }
   }
 );
+
+routerSolicitudes.post(
+  "/aprobar_solicitud/:idsolicitud",
+  [
+    body("pais")
+      .notEmpty()
+      .withMessage("El pais de entrega es un campo obligatorio"),
+    body("dep")
+      .notEmpty()
+      .withMessage("El departamento de entrega es un campo obligatorio"),
+    body("city")
+      .notEmpty()
+      .withMessage("La ciudad de entrega es un campo obligatorio"),
+    body("adre")
+      .notEmpty()
+      .withMessage("La direccion de entrega es un campo obligatorio"),
+    body("nameR")
+      .notEmpty()
+      .withMessage("El nombre del responsable es un campo obligatorio"),
+    body("phone")
+      .notEmpty()
+      .withMessage("El celular del responsable es un campo obligatorio"),
+    body("mensaje")
+      .notEmpty()
+      .withMessage("El mensaje es un campo obligatorio"),
+  ],
+  async (req, res) => {
+    const resultErrors = validationResult(req).formatWith(errorFormatter);
+    if (!resultErrors.isEmpty()) {
+      const errorResponse = formatErrorValidator(resultErrors);
+      return res.status(422).json(formatResponse({}, errorResponse));
+    }
+
+    const newConnection = await connection.awaitGetConnection();
+    await newConnection.awaitBeginTransaction();
+
+    try {
+      const { pais, dep, city, adre, nameR, phone, mensaje } = req.body;
+
+      const { idsolicitud } = req.params;
+
+      const exitSolicitud = await newConnection.awaitQuery(
+        `SELECT * FROM solicitudes WHERE idSolicitud= ?`,
+        [idsolicitud]
+      );
+
+      if (!exitSolicitud[0]) {
+        newConnection.release();
+        return res
+          .status(422)
+          .json(
+            formatResponse(
+              {},
+              `La solicitud no se encuentra en la base de datos, comprueba que el ID de la solicitud es correcto.`
+            )
+          );
+      }
+
+      const newpwdido = await newConnection.awaitQuery(
+        `INSERT INTO pedido(fk_idSolicitud, pais, departamento, ciudad, direccion, nombreResponsable, celularResponsable, mensaje) VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
+        [idsolicitud, pais, dep, city, adre, nameR, phone, mensaje]
+      );
+
+      await newConnection.awaitQuery(
+        `UPDATE solicitudes SET estado= ? WHERE idSolicitud= ?`,
+        ["Aprobada", idsolicitud]
+      );
+
+      const pedidoID = newpwdido.insertId;
+
+      const pedidoSolicitud = await newConnection.awaitQuery(
+        `SELECT * FROM pedido WHERE fk_idSolicitud= ?`,
+        [pedidoID]
+      );
+
+      await newConnection.awaitCommit();
+      newConnection.release();
+
+      return res.status(201).json(
+        formatResponse(
+          {
+            message: "Solicitud aprobada con exito",
+            pedido: pedidoSolicitud[0],
+            status: "Aprobada",
+          },
+          ""
+        )
+      );
+    } catch (error) {
+      console.log(error);
+      await newConnection.awaitRollback();
+      newConnection.release();
+      const errorFormated = formatErrorResponse(error);
+      return res.status(500).json(errorFormated);
+    }
+  }
+);
+
+routerSolicitudes.put("/rechazar_solicitud/:idsolicitud", async (req, res) => {
+  const resultErrors = validationResult(req).formatWith(errorFormatter);
+  if (!resultErrors.isEmpty()) {
+    const errorResponse = formatErrorValidator(resultErrors);
+    return res.status(422).json(formatResponse({}, errorResponse));
+  }
+
+  const newConnection = await connection.awaitGetConnection();
+  await newConnection.awaitBeginTransaction();
+
+  try {
+    const { idsolicitud } = req.params;
+
+    const exitSolicitud = await newConnection.awaitQuery(
+      `SELECT * FROM solicitudes WHERE idSolicitud= ?`,
+      [idsolicitud]
+    );
+
+    if (!exitSolicitud[0]) {
+      newConnection.release();
+      return res
+        .status(422)
+        .json(
+          formatResponse(
+            {},
+            `La solicitud no se encuentra en la base de datos, comprueba que el ID de la solicitud es correcto.`
+          )
+        );
+    }
+
+    await newConnection.awaitQuery(
+      `UPDATE solicitudes SET estado= ? WHERE idSolicitud= ?`,
+      ["Rechazada", idsolicitud]
+    );
+
+    await newConnection.awaitCommit();
+    newConnection.release();
+
+    return res
+      .status(201)
+      .json(
+        formatResponse(
+          { message: "Solicitud rechazada con exito", status: "Rechazada" },
+          ""
+        )
+      );
+  } catch (error) {
+    console.log(error);
+    await newConnection.awaitRollback();
+    newConnection.release();
+    const errorFormated = formatErrorResponse(error);
+    return res.status(500).json(errorFormated);
+  }
+});
 
 export default routerSolicitudes;

@@ -428,6 +428,56 @@ CREATE TABLE IF NOT EXISTS `ecoPlastic`.`mensajes_solicitud` (
 
 
 
+DROP TABLE IF EXISTS `ecoPlastic`.`pedido` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`pedido` (
+  `fk_idSolicitud` INT NOT NULL,
+  `pais` VARCHAR(255) NOT NULL,
+  `departamento` VARCHAR(255) NOT NULL,
+  `ciudad` VARCHAR(255) NOT NULL,
+  `direccion` VARCHAR(255) NOT NULL,
+  `nombreResponsable` VARCHAR(255) NOT NULL,
+  `celularResponsable` VARCHAR(255) NOT NULL,
+  INDEX `fk_pedido_solicitudes1_idx` (`fk_idSolicitud` ASC),
+  PRIMARY KEY (`fk_idSolicitud`),
+  CONSTRAINT `fk_pedido_solicitudes1`
+    FOREIGN KEY (`fk_idSolicitud`)
+    REFERENCES `ecoPlastic`.`solicitudes` (`idSolicitud`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+-- -----------------------------------------------------
+-- Table `ecoPlastic`.`notificaciones_usuario`
+-- -----------------------------------------------------
+DROP TABLE IF EXISTS `ecoPlastic`.`notificaciones_usuario` ;
+
+CREATE TABLE IF NOT EXISTS `ecoPlastic`.`notificaciones_usuario` (
+  `idNotificacion` INT NOT NULL AUTO_INCREMENT,
+  `fk_userID` INT NOT NULL,
+  `referenciaLink` VARCHAR(255) NOT NULL,
+  `estadoNotificacion` TINYINT(1) NOT NULL DEFAULT 0,
+  `nombreNotificacionReferencia` VARCHAR(255) NOT NULL,
+  `idReferencia` VARCHAR(255) NOT NULL,
+  `nombreTipo` VARCHAR(255) NOT NULL,
+  `fechaNotificacion` DATETIME NOT NULL,
+  `fk_idSender` INT NOT NULL,
+  PRIMARY KEY (`idNotificacion`),
+  INDEX `fk_notificaciones_usuario_usuario1_idx` (`fk_userID` ASC) ,
+  INDEX `fk_notificaciones_usuario_usuario2_idx` (`fk_idSender` ASC) ,
+  CONSTRAINT `fk_notificaciones_usuario_usuario1`
+    FOREIGN KEY (`fk_userID`)
+    REFERENCES `ecoPlastic`.`usuario` (`idusers`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION,
+  CONSTRAINT `fk_notificaciones_usuario_usuario2`
+    FOREIGN KEY (`fk_idSender`)
+    REFERENCES `ecoPlastic`.`usuario` (`idusers`)
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION);
+
+
+
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
