@@ -9,6 +9,7 @@ import {
   formatErrorValidator,
   formatResponse,
 } from "../helpers/errorFormatter.js";
+import { NotificacionesUsers } from "../helpers/NotificacionesUsers.js";
 
 const routerSolicitudes = express.Router();
 
@@ -53,6 +54,24 @@ routerSolicitudes.post(
         );
       }
 
+      const userProduct = await newConnection.awaitQuery(
+        `SELECT usuario_idusers id FROM productos WHERE idproductos= ?`,
+        [idProducto]
+      );
+
+      const io = req.app.get("socketio");
+
+      NotificacionesUsers(
+        io,
+        userProduct,
+        `/app/detail_solicitudes/${requestID}/user`,
+        "notificaciones_nueva_solicitud_usuario",
+        requestID,
+        "nueva_solicitud",
+        idEnvia,
+        ""
+      );
+
       await newConnection.awaitCommit();
       newConnection.release();
 
@@ -94,6 +113,44 @@ routerSolicitudes.post(
         [idSolicitud, textoMensaje, day, idEnvia]
       );
 
+      const userRequest = await newConnection.awaitQuery(
+        `SELECT idusers_envia id, fk_idproductos FROM solicitudes WHERE idSolicitud= ?`,
+        [idSolicitud]
+      );
+
+      const { id, fk_idproductos } = userRequest[0];
+
+      const userProduct = await newConnection.awaitQuery(
+        `SELECT usuario_idusers id FROM productos WHERE idproductos= ?`,
+        [fk_idproductos]
+      );
+
+      const io = req.app.get("socketio");
+
+      if (id === Number(idEnvia)) {
+        NotificacionesUsers(
+          io,
+          userProduct,
+          `/app/detail_solicitudes/${idSolicitud}/user`,
+          "notificaciones_nueva_mensaje_solicitud_usuario",
+          idSolicitud,
+          "nueva_mensaje_solicitud",
+          idEnvia,
+          ""
+        );
+      } else {
+        NotificacionesUsers(
+          io,
+          userRequest,
+          `/app/detail_solicitudes/${idSolicitud}/user`,
+          "notificaciones_nueva_mensaje_solicitud_usuario",
+          idSolicitud,
+          "nueva_mensaje_solicitud",
+          idEnvia,
+          ""
+        );
+      }
+
       await newConnection.awaitCommit();
       newConnection.release();
 
@@ -123,7 +180,7 @@ routerSolicitudes.get("/get_mis_solicitud/:id", async (req, res) => {
     const { id } = req.params;
 
     const request = await newConnection.awaitQuery(
-      `SELECT * FROM solicitudes WHERE idusers_envia= ?`,
+      `SELECT * FROM solicitudes WHERE idusers_envia= ? ORDER BY createDate DESC`,
       [id]
     );
 
@@ -172,7 +229,7 @@ routerSolicitudes.get("/get_mis_solicitud_productos/:id", async (req, res) => {
       const { idproductos } = iterator;
 
       const requestProduct = await newConnection.awaitQuery(
-        `SELECT * FROM solicitudes WHERE fk_idproductos= ?`,
+        `SELECT * FROM solicitudes WHERE fk_idproductos= ? ORDER BY createDate DESC`,
         [idproductos]
       );
 
@@ -217,7 +274,7 @@ routerSolicitudes.get("/get_admin_solicitud/:idEmpresa", async (req, res) => {
       const { idusers } = iterator;
 
       const request = await newConnection.awaitQuery(
-        `SELECT * FROM solicitudes WHERE idusers_envia= ?`,
+        `SELECT * FROM solicitudes WHERE idusers_envia= ? ORDER BY createDate DESC`,
         [idusers]
       );
 
@@ -537,12 +594,30 @@ routerSolicitudes.post(
         ["Aprobada", idsolicitud]
       );
 
-      const pedidoID = newpwdido.insertId;
-
       const pedidoSolicitud = await newConnection.awaitQuery(
         `SELECT * FROM pedido WHERE fk_idSolicitud= ?`,
-        [pedidoID]
+        [idsolicitud]
       );
+
+      const userSolicitud = await newConnection.awaitQuery(
+        `SELECT idusers_envia id FROM solicitudes WHERE idSolicitud= ?`,
+        [idsolicitud]
+      );
+
+      const io = req.app.get("socketio");
+
+      NotificacionesUsers(
+        io,
+        userSolicitud,
+        `/app/detail_solicitudes/${idsolicitud}/user`,
+        "notificaciones_aprobar_solicitud_usuario",
+        idsolicitud,
+        "nueva_aprobar_solicitud",
+        userSolicitud[0].id,
+        ""
+      );
+
+      console.log(pedidoSolicitud);
 
       await newConnection.awaitCommit();
       newConnection.release();
@@ -600,6 +675,24 @@ routerSolicitudes.put("/rechazar_solicitud/:idsolicitud", async (req, res) => {
     await newConnection.awaitQuery(
       `UPDATE solicitudes SET estado= ? WHERE idSolicitud= ?`,
       ["Rechazada", idsolicitud]
+    );
+
+    const userSolicitud = await newConnection.awaitQuery(
+      `SELECT idusers_envia id FROM solicitudes WHERE idSolicitud= ?`,
+      [idsolicitud]
+    );
+
+    const io = req.app.get("socketio");
+
+    NotificacionesUsers(
+      io,
+      userSolicitud,
+      `/app/detail_solicitudes/${idsolicitud}/user`,
+      "notificaciones_rechazar_solicitud_usuario",
+      idsolicitud,
+      "nueva_rechazar_solicitud",
+      userSolicitud[0].id,
+      ""
     );
 
     await newConnection.awaitCommit();

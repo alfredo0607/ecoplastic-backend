@@ -35,3 +35,29 @@ await newConnection.awaitQuery(
 const notificationsID = notifications.insertId;
 
 const day = dayjs(fecha_nacimiento).locale(es).format("YYYY-MM-DD");
+
+const io = req.app.get("socketio");
+
+NotificacionesUsers(
+  io,
+  userProduct,
+  `/app/detail_solicitudes/${requestID}/user`,
+  "notificaciones_nueva_solicitud_usuario",
+  requestID,
+  "nueva_solicitud",
+  idEnvia,
+  ""
+);
+
+const type = "request";
+
+SendNotificationUsers(
+  io,
+  arrayUserNotifications,
+  `/app/gestion_solicitudes?SID=${idSolicitud}&UID=`,
+  "notificaciones_asignar_area_solicitud_usuario",
+  idSolicitud,
+  "asignar_area_solicitud",
+  iduser,
+  type
+);

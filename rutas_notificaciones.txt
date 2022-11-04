@@ -1,0 +1,27 @@
+
+
+solicitudes : {
+    notificaciones_nueva_solicitud_usuario =
+    notificaciones_nueva_mensaje_solicitud_usuario =
+    notificaciones_aprobar_solicitud_usuario =
+    notificaciones_rechazar_solicitud_usuario =
+
+type : {
+    nueva_solicitud,
+    nueva_mensaje_solicitud,
+    nueva_aprobar_solicitud,
+    nueva_rechazar_solicitud,
+}
+
+
+}
+
+producto : {
+    notificaciones_comentario_producto_usuario =
+
+type : {
+    nueva_comentario,
+}
+
+
+}

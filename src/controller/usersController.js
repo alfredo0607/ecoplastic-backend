@@ -596,6 +596,8 @@ usersRouter.post(
           );
         }
 
+        newConnection.release();
+
         res.status(201).json({
           errores: "",
           data: {

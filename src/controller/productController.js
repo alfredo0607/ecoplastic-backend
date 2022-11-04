@@ -11,6 +11,7 @@ import {
 import uploadFile from "../helpers/uploadFile.js";
 import es from "dayjs/locale/es.js";
 import connection from "../db.js";
+import { NotificacionesUsers } from "../helpers/NotificacionesUsers.js";
 
 const productRouter = express.Router();
 
@@ -760,6 +761,26 @@ productRouter.post(
         WHERE c.fk_idproductos= ?`,
         [idPublicacion]
       );
+
+      const userProduct = await newConnection.awaitQuery(
+        `SELECT usuario_idusers id FROM productos WHERE idproductos= ?`,
+        [idPublicacion]
+      );
+
+      if (userProduct && userProduct[0].id !== id) {
+        const io = req.app.get("socketio");
+
+        NotificacionesUsers(
+          io,
+          userProduct,
+          `/app/product/${idPublicacion}`,
+          "notificaciones_comentario_producto_usuario",
+          idPublicacion,
+          "nueva_comentario",
+          id,
+          ""
+        );
+      }
 
       newConnection.release();
 

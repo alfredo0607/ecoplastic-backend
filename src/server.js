@@ -11,6 +11,7 @@ import morgan from "morgan";
 import fileupload from "express-fileupload";
 import { fileURLToPath } from "url";
 import path, { dirname } from "path";
+import { Server } from "socket.io";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -29,6 +30,7 @@ app.use(morgan("dev"));
 // }
 
 const httpsServer = http.createServer(app);
+const io = new Server(httpsServer, { cors: { origin: "*" } });
 
 app.use(
   "/uploads",
@@ -50,6 +52,13 @@ app.use((req, res, next) => {
 
 app.use("/api/v1", appRouter);
 app.use("/", swaggerUI.serve, swaggerUI.setup(docs));
+
+app.set("socketio", io);
+
+io.on("connection", (socket) => {
+  socket.join(`notificaciones ${socket.handshake.query.userID}`);
+  console.log("Nuevo cliente: ", socket.id);
+});
 
 app.get("*", function (req, res) {
   res.status(404).send("Error 404 - Recurso no encontrado");
