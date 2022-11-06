@@ -5,7 +5,8 @@
   "description": "Api de EcoPlastic para el manejo de la informacion de los usuarios",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon ./src/server.js"
+    "dev": "nodemon ./src/server.js",
+    "start": "node ./src/server.js"
   },
   "keywords": [
     "EcoPlastic",
