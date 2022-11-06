@@ -46,8 +46,6 @@ productRouter.post(
 
       const { id } = req.params;
 
-      const cuerpoPublicacion = JSON.stringify(descripcion);
-
       const exitCategoria = await newConnection.awaitQuery(
         `SELECT * FROM categoria WHERE idcategoria= ?`,
         [categoria]
@@ -90,7 +88,7 @@ productRouter.post(
           null,
           categoria,
           titulo,
-          "cuerpoPublicacion",
+          descripcion,
           day,
           iscominetario,
           isoculto,
@@ -153,8 +151,13 @@ productRouter.get("/get_publicacione/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
+    let arrayResults = [];
+
     const exitUser = await newConnection.awaitQuery(
-      `SELECT * FROM usuario WHERE idusers= ?`,
+      `SELECT empresa_idempresa FROM usuario u
+        INNER JOIN empresa e
+        ON e.idempresa= u.empresa_idempresa
+      WHERE u.idusers= ?`,
       [id]
     );
 
@@ -171,24 +174,56 @@ productRouter.get("/get_publicacione/:id", async (req, res) => {
     }
 
     const response = await newConnection.awaitQuery(
-      `SELECT AVG(calificacion) as rating, p.idproductos, p.titulo, p.descripcion, p.createdate, p.cover, u.nombre,
-        e.nombre_empresa, e.imageUrl FROM comentarios c
-        INNER JOIN productos p
-        ON p.idproductos= c.fk_idproductos 
+      `SELECT p.idproductos, p.titulo, p.descripcion, p.createdate, p.cover, u.nombre,
+        e.nombre_empresa, e.imageUrl FROM productos p
         INNER JOIN usuario u
-        ON u.idusers= c.fk_idusers   
+        ON u.idusers = p.usuario_idusers
         INNER JOIN empresa e
         ON e.idempresa= u.empresa_idempresa   
-        WHERE p.isocultar= ?
-        GROUP BY (c.fk_idproductos) 
-        ORDER BY rating DESC;
+        WHERE p.isocultar= ? AND e.idempresa != ?;
       `,
-      [0]
+      [0, exitUser[0].empresa_idempresa]
     );
+
+    for (const iterator of response) {
+      const { idproductos } = iterator;
+
+      const response = await newConnection.awaitQuery(
+        `SELECT AVG(calificacion) as rating FROM comentarios WHERE fk_idproductos= ?;
+        `,
+        [idproductos]
+      );
+
+      if (response[0] && response[0].rating !== null) {
+        const data = {
+          ...iterator,
+          rating: response[0].rating,
+        };
+
+        arrayResults.push(data);
+      } else {
+        const data = {
+          ...iterator,
+          rating: 0,
+        };
+
+        arrayResults.push(data);
+      }
+    }
+
+    arrayResults.sort((a, b) => {
+      if (a.rating == b.rating) {
+        return 0;
+      }
+      if (a.rating > b.rating) {
+        return -1;
+      }
+      return 1;
+    });
 
     newConnection.release();
 
-    return res.status(201).json(formatResponse({ response }, ""));
+    return res.status(201).json(formatResponse({ response: arrayResults }, ""));
   } catch (error) {
     console.log(error);
     newConnection.release();
@@ -535,8 +570,6 @@ productRouter.put(
         [id]
       );
 
-      console.log(newStatus);
-
       if (!exitUser[0]) {
         newConnection.release();
         return res
@@ -609,8 +642,6 @@ productRouter.put(
       const { id, idPublicacion } = req.params;
 
       const { newStatus } = req.body;
-
-      console.log(newStatus);
 
       const exitUser = await newConnection.awaitQuery(
         `SELECT * FROM usuario WHERE idusers= ?`,
@@ -817,8 +848,6 @@ productRouter.get("/categorias", async (req, res) => {
       `SELECT idcategoria id, nombre title FROM categoria`,
       []
     );
-
-    console.log(category);
 
     newConnection.release();
 

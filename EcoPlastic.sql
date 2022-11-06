@@ -478,6 +478,11 @@ CREATE TABLE IF NOT EXISTS `ecoPlastic`.`notificaciones_usuario` (
 
 
 
+INSERT INTO categoria(idcategoria,nombre) VALUES(1,'Carton');
+
+INSERT INTO roles(idroles,name_rol) VALUES(1,'Admin'),(2,'Operario');
+
+
 SET SQL_MODE=@OLD_SQL_MODE;
 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS;
 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;

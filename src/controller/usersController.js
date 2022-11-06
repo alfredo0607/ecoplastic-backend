@@ -10,8 +10,10 @@ import {
   formatErrorValidator,
   formatResponse,
 } from "../helpers/errorFormatter.js";
+import { sendEmail } from "../helpers/mailer.js";
 import { getArrayWhereQueryUsers } from "../helpers/queriesHelper.js";
 import uploadFile from "../helpers/uploadFile.js";
+import { welcomeEmailTemplates } from "../helpers/welcomeEmailTemplates.js";
 import isAdmin from "../utils/isAdmin.js";
 import checkToken from "../utils/middlewares.js";
 
@@ -208,6 +210,18 @@ usersRouter.post(
         [usersID]
       );
 
+      await sendEmail(
+        email,
+        `${nombre} Bienvenid@ a la familia EcoPlastic`,
+        `
+        ${nombre} Te damos la bienvenid@ a la familia EcoPlastic, para nosotros es un honor que nos ayudes en esta lucha contra el cambio climático,
+        desde tu cuenta podrás intercambiar los desechos de las materias prima de tu empresa con otras empresas de la familia EcoPlastic.
+        Puedes activar cuenta con tu numero de cedula:
+
+     `,
+        welcomeEmailTemplates(nombre)
+      );
+
       await newConnection.awaitCommit();
       newConnection.release();
 
@@ -283,6 +297,7 @@ usersRouter.post("/obtener_usuarios", isAdmin, async (req, res) => {
     });
   } catch (error) {
     console.log(error);
+    newConnection.release();
   }
 });
 
@@ -313,6 +328,8 @@ usersRouter.post(
       );
 
       response.push({ title: "Información Básica", data: usersBasic });
+
+      newConnection.release();
 
       return res.status(200).json({
         errores: "",
@@ -611,13 +628,11 @@ usersRouter.post(
         newConnection.release();
         const errorFormated = formatErrorResponse(error);
         return res.status(500).json(errorFormated);
-
-        return;
       }
     } catch (error) {
+      newConnection.release();
       console.log(error);
       res.status(500).json({ errores: error, data: "" });
-
       return;
     }
   }
@@ -1221,6 +1236,7 @@ usersRouter.post(
         const extension = arrayFile[arrayFile.length - 1];
 
         if (!mimeTypes.includes(archivo.mimetype)) {
+          newConnection.release();
           return res.status(422).json({
             errores: `El tipo de archivo de: ${archivo.name} no esta permitido, operacion cancelada`,
             data: "",

@@ -617,8 +617,6 @@ routerSolicitudes.post(
         ""
       );
 
-      console.log(pedidoSolicitud);
-
       await newConnection.awaitCommit();
       newConnection.release();
 

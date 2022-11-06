@@ -14,6 +14,7 @@ import { sendEmail } from "../helpers/mailer.js";
 import templateEmailPassRecovery from "../helpers/emailTemplates.js";
 import checkToken from "../utils/middlewares.js";
 import codeGenerator from "../helpers/codeGenerator.js";
+import { welcomeEmailTemplates } from "../helpers/welcomeEmailTemplates.js";
 
 const authRouter = express.Router();
 
@@ -159,6 +160,8 @@ authRouter.post("/check_email/:email", async (req, res) => {
         )
       );
     }
+
+    newConnection.release();
   } catch (error) {
     console.log(error);
     newConnection.release();
@@ -346,6 +349,19 @@ authRouter.post(
         [usersID, pregunta1, pregunta2, respuesta1, respuesta2]
       );
 
+      // CORREO DE BIENVENIDA DEl MASTER
+      await sendEmail(
+        emailUsers,
+        `${nombre} Bienvenid@ a la familia EcoPlastic`,
+        `
+        ${nombre} Te damos la bienvenid@ a la familia EcoPlastic, para nosotros es un honor que nos ayudes en esta lucha contra el cambio climático,
+        desde tu cuenta podrás intercambiar los desechos de las materias prima de tu empresa con otras empresas de la familia EcoPlastic.
+        Puede iniciar sesion con su correo y contraseña registradas.
+
+     `,
+        welcomeEmailTemplates(nombre)
+      );
+
       await newConnection.awaitCommit();
       newConnection.release();
 
@@ -396,7 +412,6 @@ authRouter.post("/validate-cedula/:cedula", async (req, res) => {
 
     if (type === "recovery") {
       if (existUsers[0] && !existUsers[0].password) {
-        console.log("entra 22");
         newConnection.release();
         return res
           .status(422)
@@ -409,9 +424,8 @@ authRouter.post("/validate-cedula/:cedula", async (req, res) => {
       }
     }
 
-    newConnection.release();
-
     if (existUsers[0]) {
+      newConnection.release();
       return res.status(201).json(
         formatResponse({
           registrado: true,
@@ -420,6 +434,7 @@ authRouter.post("/validate-cedula/:cedula", async (req, res) => {
     }
 
     if (!existUsers[0]) {
+      newConnection.release();
       return res.status(201).json(
         formatResponse({
           message: `No se encontro un usuario registrado con la cédula: ${cedula}`,
@@ -519,7 +534,6 @@ authRouter.post(
 authRouter.post(
   "/recover-password",
   [body("cedula").notEmpty().withMessage("La cedula es obigatoria")],
-
   async (req, res) => {
     const resultErrors = validationResult(req).formatWith(errorFormatter);
     if (!resultErrors.isEmpty()) {
@@ -531,7 +545,6 @@ authRouter.post(
       req.query.methodRecover !== "methodEmail" &&
       req.query.methodRecover !== "methodQuestion"
     ) {
-      newConnection.release();
       return res
         .status(422)
         .json(
@@ -549,10 +562,9 @@ authRouter.post(
       const { email, respuestaUno, respuestaDos, cedula } = req.body;
       const { methodRecover } = req.query;
 
-      console.log(req.body);
-
       if (methodRecover === "methodEmail") {
         if (!req.body.email || req.body.email === "") {
+          newConnection.release();
           return res
             .status(422)
             .json(
@@ -564,7 +576,7 @@ authRouter.post(
         }
 
         const existUsersEmail = await newConnection.awaitQuery(
-          `SELECT idusers, cedula FROM usuario WHERE email= ? AND cedula= ?`,
+          `SELECT idusers, nombre FROM usuario WHERE email= ? AND cedula= ?`,
           [email, req.body.cedula]
         );
 
@@ -580,7 +592,7 @@ authRouter.post(
             );
         }
 
-        const { idusers, cedula } = existUsersEmail[0];
+        const { idusers, nombre } = existUsersEmail[0];
 
         const codigoEmail = codeGenerator.generarCodigoRecuperacion();
 
@@ -601,6 +613,8 @@ authRouter.post(
           );
         }
 
+        const day = dayjs().locale(es).format("DD[ ]MMMM[ ]YYYY");
+
         const result = await sendEmail(
           email,
           "Recuperación de contraseña - EcoPlastic",
@@ -609,7 +623,7 @@ authRouter.post(
          por favor ingresa el código de abajo en la Plataforma para continuar con tu proceso de recuperación de contraseña.
          Código: ${codigoEmail}
        `,
-          templateEmailPassRecovery(cedula, codigoEmail, email)
+          templateEmailPassRecovery(nombre, day, codigoEmail)
         );
 
         await newConnection.awaitCommit();
@@ -693,6 +707,7 @@ authRouter.post(
           respuestasDB[0].respuesta_1 === respuestaUno.trim() &&
           respuestasDB[0].respuesta_2 === respuestaDos.trim()
         ) {
+          newConnection.release();
           return res.status(201).json(
             formatResponse(
               {
@@ -703,6 +718,7 @@ authRouter.post(
             )
           );
         } else {
+          newConnection.release();
           return res
             .status(422)
             .json(
@@ -816,12 +832,12 @@ authRouter.get(
           );
       }
 
-      newConnection.release();
-
       const data = {
         preguntaUno: preguntas[0].pregunta_1,
         preguntaDos: preguntas[0].pregunta_2,
       };
+
+      newConnection.release();
 
       return res.status(200).json(
         formatResponse(
@@ -894,9 +910,8 @@ authRouter.post(
 
       const { codigo } = codeUsers[0];
 
-      newConnection.release();
-
       if (code === codigo) {
+        newConnection.release();
         return res.status(200).json(
           formatResponse(
             {
@@ -906,6 +921,7 @@ authRouter.post(
           )
         );
       } else {
+        newConnection.release();
         return res.status(200).json(
           formatResponse(
             {
@@ -1066,6 +1082,7 @@ authRouter.post(
             )
           );
       }
+
       const {
         idusers,
         cedula,
@@ -1074,11 +1091,15 @@ authRouter.post(
         estadoUsuario,
         empresa_idempresa,
       } = existUsers[0];
+
       const existUsersAuth = await newConnection.awaitQuery(
         `SELECT password pass, lastLogin lass FROM usuario_auth  WHERE usuario_idusers= ?`,
         [idusers]
       );
-      if (!existUsersAuth[0]) {
+      if (
+        !existUsersAuth[0] ||
+        (existUsersAuth[0] && existUsersAuth[0].pass === null)
+      ) {
         newConnection.release();
         return res
           .status(422)
@@ -1089,6 +1110,7 @@ authRouter.post(
             )
           );
       }
+
       const { pass, lass } = existUsersAuth[0];
 
       const isPassword = await bcrypt.compareSync(password, pass);
@@ -1101,6 +1123,7 @@ authRouter.post(
       }
 
       const lastLogin = dayjs().locale(es).format("YYYY-MM-DD HH:mm:ss");
+
       await newConnection.awaitQuery(
         `UPDATE usuario_auth SET lastLogin = ? WHERE usuario_idusers = ?`,
         [lastLogin, idusers]
@@ -1127,6 +1150,7 @@ authRouter.post(
       });
 
       newConnection.release();
+
       return res.status(201).json(
         formatResponse(
           {

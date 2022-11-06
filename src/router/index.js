@@ -1,3 +1,5 @@
+import dayjs from "dayjs";
+import es from "dayjs/locale/es.js";
 import express from "express";
 import authRouter from "../controller/authController.js";
 import estadicticasRouter from "../controller/estadicticasController.js";

@@ -27,8 +27,11 @@ const uploadFile = async (
       [idArchivo, _nombreReferencia, _idReferencia]
     );
 
+    newConnection.release();
+
     return _nombreServidor;
   } catch (error) {
+    newConnection.release();
     console.log(error);
     return 0;
   }
