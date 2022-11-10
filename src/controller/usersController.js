@@ -1301,7 +1301,7 @@ usersRouter.post(
           id: idArchivo[0].idArchivo,
           icon: extension,
           fileName: fileInfo[0].nombreCliente,
-          serverName: `http://localhost:3006/${rutaArchivo}`,
+          serverName: `https://ecoplastic.herokuapp.com/${rutaArchivo}`,
           thumnail: String(extension).toUpperCase(),
           isImage: isImage,
           date: fileInfo[0].fechaCreado,
@@ -1409,7 +1409,7 @@ usersRouter.post("/obtener_archivos_usuario/:userID", async (req, res) => {
       icon: item.nombreServidor.split(".")[1],
       thumnail: String(item.nombreServidor.split(".")[1]).toUpperCase(),
       selected: false,
-      serverName: `http://localhost:3006/${item.rutaCompleta}`,
+      serverName: `https://ecoplastic.herokuapp.com/${item.rutaCompleta}`,
     }));
 
     if (parseInt(total[0].totalRegistros) > offset + formatedFiles.length)
