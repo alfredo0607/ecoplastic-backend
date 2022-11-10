@@ -61,5 +61,5 @@ io.on("connection", (socket) => {
 });
 
 app.get("*", function (req, res) {
-  res.status(404).send("Error 404 - Recurso no encontrado");
+  res.status(404).send("Error 404 - Recurso no encontrado.");
 });
