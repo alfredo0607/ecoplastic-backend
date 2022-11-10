@@ -82,19 +82,11 @@ productRouter.post(
 
       const day = dayjs().locale(es).format("YYYY-MM-DD HH:mm");
 
+      const text = descripcion?.blocks[0]?.text;
+
       const publicacionID = await newConnection.awaitQuery(
         `INSERT INTO productos VALUES(?,?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          null,
-          categoria,
-          titulo,
-          descripcion,
-          day,
-          iscominetario,
-          isoculto,
-          id,
-          cover,
-        ]
+        [null, categoria, titulo, text, day, iscominetario, isoculto, id, cover]
       );
 
       const puID = publicacionID.insertId;
