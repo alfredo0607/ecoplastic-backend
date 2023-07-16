@@ -14,11 +14,4 @@ connection.on(`error`, (err) => {
   console.error(`Connection error ${err.code}`);
 });
 
-// const pruebaDataBase = async () => {
-//   const data = await connection.awaitQuery(`SELECT * FROM usuario`);
-//   console.log(data);
-// };
-
-// pruebaDataBase();
-
 export default connection;
